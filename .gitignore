@@ -1,0 +1,5 @@
+*.py
+bin/
+objs/
+.vscode/
+.DS_Store
