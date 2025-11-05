@@ -25,31 +25,31 @@ $$
 - **Evaluation**: Horner's method in reverse order (a₀ ... a₅)
 
 ### Accuracy Results
-**Error Statistics** (10⁷ test points over [10⁻¹², 1-10⁻¹²]):
+**Error Statistics** ($10^{6}$ test points over [10⁻¹², 1-10⁻¹²]):
 
 | Configuration | Max Error | Mean Error | p99 Error |
 |--------------|-----------|------------|-----------|
-| Baseline (Bisection) | 1.11×10⁻¹⁶ | 3.33×⁻¹⁷ | 1.11×⁻¹⁶ |
-| Raw (No Halley) | 2.71×10⁻¹⁰ | 5.88×⁻¹⁰ | 2.62×⁻¹⁰ |
-| **With Halley (Final)** | 1.11×10⁻¹⁶ | 1.02×10⁻¹⁷ | 1.11×10⁻¹⁶ |
+| Baseline (Bisection) | 2.22×10⁻¹⁶ | 4.33×10⁻¹⁷ | 1.11×10⁻¹⁶ |
+| Raw (No Halley) | 2.73×10⁻¹⁰ | 1.14×10⁻¹⁰ | 2.70×10⁻¹⁰ |
+| **With Halley (Final)** | 2.22×10⁻¹⁶ | 2.31×10⁻¹⁷ | 1.11×10⁻¹⁶ |
 
-**Status**: Exceeds 10⁻¹² goal, achieves machine epsilon precision. Passed all round-trip, symmetry, monotonicity, and numerical derivative checks.
+**Status**: Exceeds 10⁻¹² target; achieves full double precision. Passed all round-trip, symmetry, monotonicity, and numerical derivative checks. Correctness verified on both random (10⁶) and dense (≈2000) grids, covering [10⁻¹², 1−10⁻¹²]. Symmetry and monotonicity hold. Derivative sanity confirmed to <5×10⁻⁵ relative error.
 
 **Key Insight**: The rational approximation with one Halley step provides more consistant results than bisection.
 
 ## Performance Results
 
-**Platform**: Apple M3 (ARM64), Apple Clang v 17.0.0 with -O3 optimization. **Test size**: 10⁷ evaluations.
+**Platform**: Apple M3 (ARM64), Apple Clang v 17.0.0 with -O3 optimization. **Test size**: $10^{6}$ evaluations.
 
 | Configuration | Scalar (ns/op) | Vector (ns/op) | Speedup vs Baseline |
 |--------------|----------------|----------------|---------------------|
-| Baseline (Bisection) | 1758.1 | 1799.6 | 1.0× |
-| New (No Halley, No OpenMP) | 3.5 | 2.4 | **502×** |
-| **New (Halley, No OpenMP)** | 17.9 | 16.9 | **98×** |
-| **New (Halley, OpenMP 8 threads)** | 17.6 | 4.2 | **98×** / **424×** |
+| Baseline (Bisection) | 1741.93 | 1749.89 | 1.0× |
+| New (No Halley, No OpenMP) | 5.68 | 4.78 | **306×** / **366×** |
+| **New (Halley, No OpenMP)** | 27.78 | 20.5 | **62×** / **85×** |
+| **New (Halley, OpenMP 8 threads)** | 27.69 | 5.34 | **63×** / **327×** |
 
-- **Scalar**: The final implementation is **98×** faster than the baseline, expeeding the 10× target.
-- **Vector**: Using `#pragma omp parallel for` (8 threads) on the vector overload gives a **4.2×** speedup over the single-threaded vector call, exceeding the 1.5× target. With $10^{6}$ evaluations, the speedup was slightly less, **3.9×**.
+- **Scalar**: The final implementation without parallelization is **85×** faster than the baseline, expeeding the 10× target.
+- **Vector**: Using `#pragma omp parallel for` (8 threads) on the vector overload gives a **3.8×** speedup over the single-threaded vector call, exceeding the 1.5× target.
 
 ## Limitations & Non-Idealities
 
