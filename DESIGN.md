@@ -11,6 +11,7 @@
 - **Refinement**: One Halley step is applied to the raw approximation to achieve full double precision.
 	- $z ← z - r/(1 - 0.5 · z · r)$
 	- **Stable residuals**: For central region, direct formula $r = (\phi(z) - x) / \varphi(z).$ To prevent catastrophic cancellation in the far tails ($x < 10^{−8}$ or $x > 1-10^{-8}$), the residual $r$ is calculated using the ${expm1}$ forms as specified in the brief;
+
 $$
 r =
 \begin{cases}
