@@ -16,7 +16,7 @@ $$
 r =
 \begin{cases}
  -y \cdot \mathrm{expm1}\!\left( \log(Q(z)) - \log(y) \right) / \varphi(z), & \text{for the right tail, where } y = 1 - x, \\\\[6pt]
- \;\;y \cdot \mathrm{expm1}\!\left( \log(Q(-z)) - \log(y) \right) / \varphi(z), & \text{for the left tail, where } y = x.
+ \\y \cdot \mathrm{expm1}\!\left( \log(Q(-z)) - \log(y) \right) / \varphi(z), & \text{for the left tail, where } y = x.
 \end{cases}
 $$
 
