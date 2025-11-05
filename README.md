@@ -1,4 +1,4 @@
-Implementation details are in `DESIGN.md`
+Implementation details are in [DESIGN.md](/DESIGN.md)
 
 ## How to build test main
 
