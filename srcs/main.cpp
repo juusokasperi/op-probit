@@ -5,7 +5,9 @@
 #include <chrono>
 #include <iomanip>
 #include <limits>
+#include <cfloat>
 #include <omp.h>
+#include <random>
 #include <numeric>
 #include <algorithm>
 
@@ -37,7 +39,7 @@ private:
 };
 
 int main() {
-	const size_t N_PERF_TEST = 10'000'000;
+	const size_t N_PERF_TEST = 1'000'000;
 	quant::InverseCumulativeNormal icn(0.0, 1.0);
 
 	std::cout << "--- Probit Implementation Test ---\n";
@@ -86,6 +88,69 @@ int main() {
 			<< "  err=" << std::scientific << sym_err << std::defaultfloat << "\n";
 		}
 		std::cout << "\n";
+	}
+
+	{
+		std::cout << "\n--- Large-Sample Accuracy Test (" << N_PERF_TEST << " points) ---\n";
+
+		std::mt19937_64 rng(12345);
+		std::uniform_real_distribution<double> dist(1e-12, 1.0 - 1e-12);
+
+		std::vector<double> rt_errors;
+		rt_errors.reserve(N_PERF_TEST);
+		std::vector<double> sym_errors;
+		sym_errors.reserve(N_PERF_TEST);
+
+		double max_sym_err = 0.0;
+		double max_rt_err = 0.0;
+
+		for (size_t i = 0; i < N_PERF_TEST; ++i)
+		{
+			double x = dist(rng);
+			double z = icn(x);
+			if (!std::isfinite(z)) continue;
+			if (x < 0.5 && x > 1e-10)
+			{
+				double z_sym = icn(1.0 - x);
+				if (std::isfinite(z_sym))
+				{
+					double sym_err = std::abs(z + z_sym);
+					max_sym_err = std::max(max_sym_err, sym_err);
+					sym_errors.push_back(sym_err);
+				}
+			}
+			double back = Phi_ref(z);
+			double rt_err = std::abs(back - x);
+			max_rt_err = std::max(max_rt_err, rt_err);
+			rt_errors.push_back(rt_err);
+		}
+
+		std::sort(rt_errors.begin(), rt_errors.end());
+		std::sort(sym_errors.begin(), sym_errors.end());
+
+		double mean_rt_err = std::accumulate(rt_errors.begin(), rt_errors.end(), 0.0) / rt_errors.size();
+		double p99_rt_err = rt_errors[static_cast<size_t>(rt_errors.size() * 0.99)];
+
+		double mean_sym_err = sym_errors.empty() ? 0.0
+			: std::accumulate(sym_errors.begin(), sym_errors.end(), 0.0) / sym_errors.size();
+		double p99_sym_err = sym_errors.empty() ? 0.0
+			: sym_errors[static_cast<size_t>(sym_errors.size() * 0.99)];
+
+		std::cout << "  Roundtrip Errors:\n";
+		std::cout << "    Max:  " << std::scientific << max_rt_err << "\n";
+		std::cout << "    Mean: " << std::scientific << mean_rt_err << "\n";
+		std::cout << "    p99:  " << std::scientific << p99_rt_err << "\n\n";
+
+		std::cout << "  Symmetry Errors:\n";
+		std::cout << "    Max:  " << std::scientific << max_sym_err << "\n";
+		std::cout << "    Mean: " << std::scientific << mean_sym_err << "\n";
+		std::cout << "    p99:  " << std::scientific << p99_sym_err << "\n\n";
+
+		std::cout << "  Target: <= 1e-10 (Goal: 1e-12)\n";
+		std::cout << "  Status: ";
+		if (max_rt_err <= 1e-12) std::cout << "EXCELLENT! (≤ 1e-12)\n\n";
+		else if (max_rt_err <= 1e-10) std::cout << "PASS! (≤ 1e-10)\n\n";
+		else std::cout << "FAIL! (>1e-10)\n\n";
 	}
 
 	{
@@ -187,27 +252,56 @@ int main() {
 	}
 
 	{
-		std::cout << "--- Derivative Sanity Test ---\n";
-		double deriv_test[] = {0.1, 0.3, 0.5, 0.7, 0.9};
-		for (double x : deriv_test)
-		{
-			double z = icn(x);
-			double h = 1e-8;
-			double z_plus = icn(x + h);
-			double z_minus = icn(x - h);
-			double numerical_deriv = (z_plus - z_minus) / (2.0 * h);
+		std::cout << "--- Derivative Sanity (dense) ---\n";
+		const double eps = DBL_EPSILON;
+		const double h_base = std::cbrt(eps);
 
-			// dg/dx = 1/φ(g(x))
-			double phi_z = 0.398942280401432677939946059934381868475858631164934657
-			* std::exp(-0.5 * z * z);
-			double theoretical_deriv = 1.0 / phi_z;
-			double deriv_err = std::abs(numerical_deriv - theoretical_deriv);
+		auto phi_pdf = [](double z) {
+			static const double INV_SQRT_2PI = 0.3989422804014327;
+			return INV_SQRT_2PI * std::exp(-0.5 * z * z);
+		};
 
-			std::cout << "  x=" << x << " numerical=" << numerical_deriv
-			<< " theoretical=" << theoretical_deriv
-			<< " err=" << std::scientific << deriv_err << "\n";
+		std::vector<double> pts;
+		pts.reserve(2000);
+		for (double x = 1e-12; x <= 1e-6; x *= std::pow(1e-6/1e-12, 1.0/500.0)) pts.push_back(x);
+		for (int i = 0; i < 1000; ++i) pts.push_back( (i+0.5) / 1000.0 );
+		size_t lower_count = pts.size();
+		for (size_t i = 0; i < lower_count && pts[i] < 0.5; ++i) {
+			pts.push_back(1.0 - pts[i]);
 		}
-		std::cout << "\n";
+
+		std::vector<double> rel_errs;
+		rel_errs.reserve(pts.size());
+		double max_rel = 0.0;
+		long double sum_rel = 0.0L;
+
+		for (double x : pts) {
+			if (x <= 1e-12 || x >= 1.0 - 1e-12) continue;
+			double scale = std::max(1.0, std::fabs(x));
+			double h = h_base * scale;
+			if (x - h <= 0.0 || x + h >= 1.0) continue;
+
+			double g_plus = icn(x + h);
+			double g_minus = icn(x - h);
+			if (!std::isfinite(g_plus) || !std::isfinite(g_minus)) continue;
+
+			double dnum = (g_plus - g_minus) / (2.0 * h);
+			double gx = icn(x);
+			double phi_gx = phi_pdf(gx);
+			double dth = 1.0 / phi_gx;
+			double rel = std::abs((dnum - dth) / dth);
+
+			rel_errs.push_back(rel);
+			sum_rel += rel;
+			if (rel > max_rel) max_rel = rel;
+		}
+
+		std::sort(rel_errs.begin(), rel_errs.end());
+		double mean_rel = rel_errs.empty() ? 0.0 : double(sum_rel / (long double)rel_errs.size());
+		double p99_rel = rel_errs.empty() ? 0.0 : rel_errs[static_cast<size_t>(0.99 * rel_errs.size())];
+
+		std::cout << "  Relative derivative error: max=" << std::scientific << max_rel
+				<< " mean=" << mean_rel << " p99=" << p99_rel << "\n\n";
 	}
 
 	{
