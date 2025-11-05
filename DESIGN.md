@@ -49,7 +49,7 @@ $$
 | **New (Halley, OpenMP 8 threads)** | 17.6 | 4.2 | **98×** / **424×** |
 
 - **Scalar**: The final implementation is **98×** faster than the baseline, expeeding the 10× target.
-- **Vector**: Using `#pragma omp parallel for` (8 threads) on the vector overload gives a **4.2×** speedup over the single-threaded vector call, exceeding the 1.5× target.
+- **Vector**: Using `#pragma omp parallel for` (8 threads) on the vector overload gives a **4.2×** speedup over the single-threaded vector call, exceeding the 1.5× target. With $10^{6}$ evaluations, the speedup was slightly less, **3.9×**.
 
 ## Limitations & Non-Idealities
 

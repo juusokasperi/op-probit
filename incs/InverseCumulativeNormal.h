@@ -100,7 +100,7 @@ class InverseCumulativeNormal {
             const double d_val = 1.0 + t * horner_eval(t, D_TAIL);
             return c_val / d_val;
         } else if (x > x_high_) {
-            const double t = std::sqrt(-2.0 * std::log(1.0 - x));
+            const double t = std::sqrt(-2.0 * std::log1p(-x));
             const double c_val = horner_eval(t, C_TAIL);
             const double d_val = 1.0 + t * horner_eval(t, D_TAIL);
             return -(c_val / d_val);
