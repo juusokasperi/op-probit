@@ -53,7 +53,7 @@ $$
 
 ## Limitations & Non-Idealities
 
-1. **Raw approximation accuracy**: Without Halley refinement, max error is ~2.7×10⁻¹⁰, which slightly exceeds the 10⁻¹⁰ target. One Halley step is required for production use. Refinement adds ~14 ns/op overhead but is necessary for full precision. For applications needing only ~10⁻¹⁰ accuracy, the raw approximation could be used for 500× speedup.
+1. **Raw approximation accuracy**: Without Halley refinement, max error is ~2.7×10⁻¹⁰, which slightly exceeds the 10⁻¹⁰ target. One Halley step is required for production use. Refinement adds ~14 ns/op overhead but is necessary for full precision.
 
 2. **Input validation**: Assumes x ∈ (0,1) per specification. No explicit range checking, returns ±∞ at boundaries (preserves baseline API).
 
