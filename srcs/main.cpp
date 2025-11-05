@@ -6,6 +6,8 @@
 #include <iomanip>
 #include <limits>
 #include <omp.h>
+#include <numeric>
+#include <algorithm>
 
 namespace {
 	static inline double Phi_ref(double z) {
@@ -92,6 +94,9 @@ int main() {
 		double max_rt_err = 0.0;
 
 		std::vector<double> test_xs;
+		std::vector<double> rt_errors;
+		std::vector<double> sym_errors;
+
 		for (double x = 1e-12; x < 0.5; x *= 1.5) test_xs.push_back(x);
 		for (double x = 0.01; x < 1.0; x += 0.01) test_xs.push_back(x);
 		for (double x = 1.0 - 1e-12; x > 0.5; x = 1.0 - (1.0 - x) * 1.5) test_xs.push_back(x);
@@ -102,28 +107,47 @@ int main() {
 			double z = icn(x);
 			if (!std::isfinite(z)) continue;
 
-			// Symmetry
 			if (x < 0.5 && x > 1e-10) {
 				double z_sym = icn(1.0 - x);
 				if (std::isfinite(z_sym)) {
 					double sym_err = std::abs(z + z_sym);
 					max_sym_err = std::max(max_sym_err, sym_err);
+					sym_errors.push_back(sym_err);
 				}
 			}
 
-			// Round-trip
 			double x_rt = Phi_ref(z);
 			double rt_err = std::abs(x_rt - x);
 			max_rt_err = std::max(max_rt_err, rt_err);
+			rt_errors.push_back(rt_err);
 		}
 
-		std::cout << "  Max Symmetry Error:  " << std::scientific << max_sym_err << "\n";
-		std::cout << "  Max Roundtrip Error: " << std::scientific << max_rt_err << "\n\n";
+		std::sort(rt_errors.begin(), rt_errors.end());
+		std::sort(sym_errors.begin(), sym_errors.end());
+
+		double mean_rt_err = std::accumulate(rt_errors.begin(), rt_errors.end(), 0.0) / rt_errors.size();
+		double p99_rt_err = rt_errors[static_cast<size_t>(rt_errors.size() * 0.99)];
+
+		double mean_sym_err = sym_errors.empty() ? 0.0
+			: std::accumulate(sym_errors.begin(), sym_errors.end(), 0.0) / sym_errors.size();
+		double p99_sym_err = sym_errors.empty() ? 0.0
+			: sym_errors[static_cast<size_t>(sym_errors.size() * 0.99)];
+
+		std::cout << "  Rountrip Errors:\n";
+		std::cout << "    Max:  " << std::scientific << max_rt_err << "\n";
+		std::cout << "    Mean: " << std::scientific << mean_rt_err << "\n";
+		std::cout << "    p99:  " << std::scientific << p99_rt_err << "\n";
+
+		std::cout << "  Symmetry Errors:\n";
+		std::cout << "    Max:  " << std::scientific << max_sym_err << "\n";
+		std::cout << "    Mean: " << std::scientific << mean_sym_err << "\n";
+		std::cout << "    p99:  " << std::scientific << p99_sym_err << "\n\n";
+
 		std::cout << "  Target: <= 1e-10 (Goal: 1e-12)\n";
 		std::cout << "  Status: ";
-		if (max_rt_err <= 1e-12) std::cout << "EXCELLENT! (≤ 1e-12)\n";
-		else if (max_rt_err <= 1e-10) std::cout << "PASS! (≤ 1e-10)\n";
-		else std::cout << "FAIL! (>1e-10)\n";
+		if (max_rt_err <= 1e-12) std::cout << "EXCELLENT! (≤ 1e-12)\n\n";
+		else if (max_rt_err <= 1e-10) std::cout << "PASS! (≤ 1e-10)\n\n";
+		else std::cout << "FAIL! (>1e-10)\n\n";
 	}
 
 	{
@@ -173,7 +197,7 @@ int main() {
 			double z_minus = icn(x - h);
 			double numerical_deriv = (z_plus - z_minus) / (2.0 * h);
 
-			// Theoretical: dg/dx = 1/φ(g(x))
+			// dg/dx = 1/φ(g(x))
 			double phi_z = 0.398942280401432677939946059934381868475858631164934657
 			* std::exp(-0.5 * z * z);
 			double theoretical_deriv = 1.0 / phi_z;
